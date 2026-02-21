@@ -1,0 +1,33 @@
+# Sensitive credentials
+google-credentials.json
+*.json:Zone.Identifier
+*.jpg:Zone.Identifier
+*.png:Zone.Identifier
+*.xlsx:Zone.Identifier
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Build
+.next/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Zone identifiers (Windows)
+*:Zone.Identifier
+
+# Reports (generated)
+reports/
+n8n-grupo-unico-b55e711ba40d.json
+*.json
