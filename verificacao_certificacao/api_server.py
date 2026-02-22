@@ -596,6 +596,12 @@ def get_report_data(filename: str):
     raise HTTPException(status_code=404, detail="Report data not found")
 
 
+@app.get("/api/health")
+def health_check():
+    """Lightweight health check endpoint."""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
 @app.get("/api/stats")
 def get_stats():
     """Return dashboard statistics."""
