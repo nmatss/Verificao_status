@@ -15,32 +15,54 @@ REPORTS_DIR = BASE_DIR / "reports"
 # Excel column mappings (1-indexed)
 # Imaginarium sheet
 IMAGINARIUM_COLS = {
-    "status": 21,      # SITUAÇÃO
-    "sku": 3,           # CÓDIGO
-    "name": 6,          # NOME
-    "cert_text": 22,    # Descrição E-commerce
+    "status": 21,            # SITUAÇÃO
+    "sku": 3,                # CÓDIGO
+    "name": 6,               # NOME
+    "cert_text": 22,         # Descrição E-commerce
+    "tipo_cert": 8,          # TIPO DE CERTIFICAÇÃO
+    "validade_cert": 14,     # Validade da Certificação
+    "numero_registro": 17,   # Número Registro / Homologação
+    "prazo_final_venda": 23, # Prazo Final Venda
 }
 
 # Puket sheet
 PUKET_COLS = {
-    "status": 20,       # SITUAÇÃO
-    "sku": 3,           # CÓDIGO
-    "name": 6,          # NOME
-    "cert_text": 21,    # Descrição E-commerce
+    "status": 20,            # SITUAÇÃO
+    "sku": 3,                # CÓDIGO
+    "name": 6,               # NOME
+    "cert_text": 21,         # Descrição E-commerce
+    "tipo_cert": 8,          # TIPO DE CERTIFICAÇÃO
+    "validade_cert": 14,     # Validade da Certificação
+    "numero_registro": 17,   # Número Registro / Homologação
+    "prazo_final_venda": 22, # Prazo Final Venda
 }
 
 # Puket escolares sheet
 PUKET_ESCOLARES_COLS = {
-    "status": 7,        # STATUS
-    "sku": 1,           # SKU
-    "name": 2,          # NOME COMERCIAL
-    "cert_text": 8,     # Descrição E-commerce
+    "status": 7,             # STATUS
+    "sku": 1,                # SKU
+    "name": 2,               # NOME COMERCIAL
+    "cert_text": 8,          # Descrição E-commerce
+    "tipo_cert": 3,          # TIPO
+    "validade_cert": None,   # Não há coluna de validade nesta aba
+    "numero_registro": 5,    # REGISTRO
+    "prazo_final_venda": 10, # Prazo Final Venda
 }
 
 SHEET_CONFIG = {
     "Imaginarium": IMAGINARIUM_COLS,
     "Puket": PUKET_COLS,
     "Puket escolares": PUKET_ESCOLARES_COLS,
+}
+
+# Encerramentos sheet — manual stock + EAN data maintained by the fiscal team.
+# Cruzamos por SKU pra enriquecer cada Product com codigo_barras + estoque_informado.
+ENCERRAMENTOS_SHEET = "Encerramentos"
+ENCERRAMENTOS_COLS = {
+    "sku": 2,
+    "estoque_informado": 4,
+    "codigo_barras": 8,
+    "prazo_final_venda": 7,
 }
 
 ACTIVE_STATUS = "ativo"

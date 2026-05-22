@@ -167,16 +167,25 @@ def _run_scheduled_validation(schedule_id: str):
     for i, product in enumerate(products):
         result = _validate_product(product, scraper)
         results.append(result)
+        p = result.product
         result_dicts.append({
-            "sku": result.product.sku,
-            "name": result.product.name,
-            "brand": result.product.brand.value,
+            "sku": p.sku,
+            "name": p.name,
+            "brand": p.brand.value,
             "status": result.status.value,
             "score": round(result.similarity_score, 2),
             "actual_cert_text": result.actual_cert_text,
-            "expected_cert_text": result.product.expected_cert_text,
-            "url": result.product.resolved_url,
+            "expected_cert_text": p.expected_cert_text,
+            "url": p.resolved_url,
             "error": result.error_message,
+            "site_status": result.site_status.value if result.site_status else None,
+            "cert_status": p.cert_status.value if p.cert_status else None,
+            "license_status": p.license_status.value if p.license_status else None,
+            "situacao": p.situacao,
+            "tipo_certificacao": p.tipo_certificacao,
+            "validade_certificacao_raw": p.validade_certificacao_raw,
+            "prazo_final_venda_raw": p.prazo_final_venda_raw,
+            "numero_registro": p.numero_registro,
         })
         if i < len(products) - 1:
             time.sleep(REQUEST_DELAY)
@@ -223,32 +232,41 @@ def _run_scheduled_validation(schedule_id: str):
 
 def _validate_product(product, scraper):
     """Validate a single product (mirrors api_server._validate_single without AI)."""
-    from .models import ValidationStatus, ValidationResult
+    from .comparator import compare_texts, compute_site_status
+    from .models import ValidationResult, ValidationStatus
     from .scraper import extract_cert_text
-    from .comparator import compare_texts
+
+    def _finalize(result: ValidationResult) -> ValidationResult:
+        result.site_status = compute_site_status(
+            result.status,
+            product.cert_status,
+            product.expected_cert_text,
+            product.tipo_certificacao,
+        )
+        return result
 
     if not product.expected_cert_text:
-        return ValidationResult(
+        return _finalize(ValidationResult(
             product=product,
             status=ValidationStatus.NO_EXPECTED,
             error_message="Sem texto de certificacao esperado na planilha",
-        )
+        ))
 
     try:
         full_desc, cert_text = scraper.fetch_product_description(product)
     except Exception as e:
-        return ValidationResult(
+        return _finalize(ValidationResult(
             product=product,
             status=ValidationStatus.API_ERROR,
             error_message=str(e),
-        )
+        ))
 
     if full_desc is None:
-        return ValidationResult(
+        return _finalize(ValidationResult(
             product=product,
             status=ValidationStatus.URL_NOT_FOUND,
             error_message="Produto nao encontrado na API VTEX",
-        )
+        ))
 
     if not cert_text and full_desc:
         cert_text = extract_cert_text(full_desc)
@@ -259,12 +277,12 @@ def _validate_product(product, scraper):
 
     status, score = compare_texts(product.expected_cert_text, cert_text)
 
-    return ValidationResult(
+    return _finalize(ValidationResult(
         product=product,
         status=status,
         actual_cert_text=cert_text,
         similarity_score=score,
-    )
+    ))
 
 
 def _build_summary(results: list) -> dict:
@@ -274,12 +292,25 @@ def _build_summary(results: list) -> dict:
     missing = sum(1 for r in results if r["status"] == "MISSING")
     inconsistent = sum(1 for r in results if r["status"] == "INCONSISTENT")
     not_found = sum(1 for r in results if r["status"] == "URL_NOT_FOUND")
+
+    by_site: Dict[str, int] = {}
+    by_cert: Dict[str, int] = {}
+    for r in results:
+        site = r.get("site_status")
+        if site:
+            by_site[site] = by_site.get(site, 0) + 1
+        cert = r.get("cert_status")
+        if cert:
+            by_cert[cert] = by_cert.get(cert, 0) + 1
+
     return {
         "ok": ok,
         "missing": missing,
         "inconsistent": inconsistent,
         "not_found": not_found,
         "total": total,
+        "by_site_status": [{"site_status": k, "count": v} for k, v in sorted(by_site.items())],
+        "by_cert_status": [{"cert_status": k, "count": v} for k, v in sorted(by_cert.items())],
     }
 
 

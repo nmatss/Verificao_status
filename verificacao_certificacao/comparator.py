@@ -2,9 +2,10 @@
 
 import re
 import unicodedata
-from typing import Tuple
+from typing import Optional, Tuple
 
-from .models import ValidationStatus
+from .cert_rules import derive_site_status
+from .models import CertStatus, SiteStatus, ValidationStatus
 
 
 def normalize_basic(text: str) -> str:
@@ -121,3 +122,15 @@ def compare_texts(expected: str, actual: str) -> Tuple[ValidationStatus, float]:
         score = 0.0
 
     return ValidationStatus.INCONSISTENT, score
+
+
+def compute_site_status(
+    validation_status: Optional[ValidationStatus],
+    cert_status: CertStatus,
+    expected_cert_text: Optional[str],
+    tipo_certificacao: Optional[str] = None,
+) -> SiteStatus:
+    """Wrapper conveniente em torno de derive_site_status para uso pelos callers."""
+    return derive_site_status(
+        validation_status, cert_status, expected_cert_text, tipo_certificacao
+    )

@@ -34,6 +34,10 @@ COLUMNS = [
     "SKU", "Nome", "Marca", "Aba", "Texto Esperado",
     "Texto Real", "Status", "Score", "URL", "Erro",
     "Avaliação IA",
+    "Situação", "Cert Status", "Site Status",
+    "Prazo Final Venda", "Validade Certificação",
+    "Tipo Certificação", "Número Registro",
+    "Cód. Barras", "Estoque (planilha)", "Comercialização",
 ]
 
 
@@ -90,6 +94,16 @@ def _generate_excel(results: List[ValidationResult], path: Path):
             p.resolved_url or "",
             result.error_message or "",
             result.ai_assessment or "",
+            p.situacao or "",
+            p.cert_status.value if p.cert_status else "",
+            result.site_status.value if result.site_status else "",
+            p.prazo_final_venda_raw or "",
+            p.validade_certificacao_raw or "",
+            p.tipo_certificacao or "",
+            p.numero_registro or "",
+            p.codigo_barras or "",
+            p.estoque_informado if p.estoque_informado is not None else "",
+            p.comercializacao_status.value if p.comercializacao_status else "",
         ]
 
         fill = STATUS_FILLS.get(result.status, FILL_ERROR)
@@ -194,4 +208,14 @@ def _generate_csv(results: List[ValidationResult], path: Path):
                 p.resolved_url or "",
                 result.error_message or "",
                 result.ai_assessment or "",
+                p.situacao or "",
+                p.cert_status.value if p.cert_status else "",
+                result.site_status.value if result.site_status else "",
+                p.prazo_final_venda_raw or "",
+                p.validade_certificacao_raw or "",
+                p.tipo_certificacao or "",
+                p.numero_registro or "",
+                p.codigo_barras or "",
+                p.estoque_informado if p.estoque_informado is not None else "",
+                p.comercializacao_status.value if p.comercializacao_status else "",
             ])

@@ -14,7 +14,7 @@ from .models import Brand, ValidationStatus, ValidationResult
 from .excel_reader import read_products
 from .url_resolver import URLResolver
 from .scraper import VTEXScraper, extract_cert_text
-from .comparator import compare_texts
+from .comparator import compare_texts, compute_site_status
 from .ai_verifier import verify_with_ai, is_ai_available
 from .report_generator import generate_reports
 
@@ -131,13 +131,22 @@ def _validate_products(products, ai_verify, verbose) -> list:
 
 def _validate_single(product, resolver, scraper, ai_verify, verbose) -> ValidationResult:
     """Validate a single product."""
+    def _finalize(result: ValidationResult) -> ValidationResult:
+        result.site_status = compute_site_status(
+            result.status,
+            product.cert_status,
+            product.expected_cert_text,
+            product.tipo_certificacao,
+        )
+        return result
+
     # Check if product has expected certification text
     if not product.expected_cert_text:
-        return ValidationResult(
+        return _finalize(ValidationResult(
             product=product,
             status=ValidationStatus.NO_EXPECTED,
             error_message="Sem texto de certificação esperado na planilha",
-        )
+        ))
 
     # Step 1: Fetch description via VTEX API
     try:
@@ -145,18 +154,18 @@ def _validate_single(product, resolver, scraper, ai_verify, verbose) -> Validati
     except Exception as e:
         if verbose:
             console.print(f"  [red]API error for {product.sku}: {e}[/red]")
-        return ValidationResult(
+        return _finalize(ValidationResult(
             product=product,
             status=ValidationStatus.API_ERROR,
             error_message=str(e),
-        )
+        ))
 
     if full_desc is None:
-        return ValidationResult(
+        return _finalize(ValidationResult(
             product=product,
             status=ValidationStatus.URL_NOT_FOUND,
             error_message="Produto não encontrado na API VTEX",
-        )
+        ))
 
     # If no cert text was extracted, try matching against full description
     if not cert_text and full_desc:
@@ -212,7 +221,7 @@ def _validate_single(product, resolver, scraper, ai_verify, verbose) -> Validati
         else:
             result.ai_assessment = "API key not configured"
 
-    return result
+    return _finalize(result)
 
 
 def _print_dry_run_table(products):
