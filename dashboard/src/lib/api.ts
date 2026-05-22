@@ -1,4 +1,19 @@
+import type { ProgressEventData } from "@/types"
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+/**
+ * Append `source=excel` to a path unless the caller already provided a `source`
+ * query param. Keeps the backend deterministic (excel is the canonical source).
+ */
+function withSource(path: string, source: string = "excel"): string {
+  const [base, qs = ""] = path.split("?")
+  const params = new URLSearchParams(qs)
+  if (!params.has("source")) {
+    params.set("source", source)
+  }
+  return `${base}?${params.toString()}`
+}
 
 async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -15,7 +30,7 @@ async function apiFetch(path: string, options?: RequestInit) {
 }
 
 export async function fetchStats() {
-  return apiFetch("/api/stats")
+  return apiFetch(withSource("/api/stats"))
 }
 
 export async function fetchProducts(params?: {
@@ -24,6 +39,12 @@ export async function fetchProducts(params?: {
   search?: string
   brand?: string
   status?: string
+  cert_status?: string
+  site_status?: string
+  license_status?: string
+  comercializacao_status?: string
+  situacao?: string
+  source?: string
 }) {
   const query = new URLSearchParams()
   if (params?.page) query.set("page", String(params.page))
@@ -31,18 +52,23 @@ export async function fetchProducts(params?: {
   if (params?.search) query.set("search", params.search)
   if (params?.brand) query.set("brand", params.brand)
   if (params?.status) query.set("status", params.status)
-  const qs = query.toString()
-  return apiFetch(`/api/products${qs ? `?${qs}` : ""}`)
+  if (params?.cert_status) query.set("cert_status", params.cert_status)
+  if (params?.site_status) query.set("site_status", params.site_status)
+  if (params?.license_status) query.set("license_status", params.license_status)
+  if (params?.comercializacao_status) query.set("comercializacao_status", params.comercializacao_status)
+  if (params?.situacao) query.set("situacao", params.situacao)
+  if (params?.source) query.set("source", params.source)
+  return apiFetch(withSource(`/api/products?${query.toString()}`))
 }
 
 export async function fetchProductDetail(sku: string) {
-  return apiFetch(`/api/products/${encodeURIComponent(sku)}`)
+  return apiFetch(withSource(`/api/products/${encodeURIComponent(sku)}`))
 }
 
 export async function verifyProduct(sku: string, brand: string) {
-  return apiFetch("/api/products/verify", {
+  return apiFetch(withSource("/api/products/verify"), {
     method: "POST",
-    body: JSON.stringify({ sku, brand }),
+    body: JSON.stringify({ sku, brand, source: "excel" }),
   })
 }
 
@@ -61,12 +87,12 @@ export async function fetchValidationStatus(runId: string) {
   return apiFetch(`/api/validate/${runId}`)
 }
 
-export function streamValidation(runId: string, onEvent: (data: any) => void) {
+export function streamValidation(runId: string, onEvent: (data: ProgressEventData) => void) {
   const eventSource = new EventSource(`${API_BASE}/api/validate/${runId}/stream`)
 
   eventSource.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data)
+      const data = JSON.parse(event.data) as ProgressEventData
       onEvent(data)
       if (data.type === "complete" || data.type === "error") {
         eventSource.close()
@@ -149,5 +175,5 @@ export async function fetchReportDetail(filename: string) {
 }
 
 export function getReportDownloadUrl(filename: string) {
-  return `${API_BASE}/api/reports/${filename}`
+  return `${API_BASE}/api/reports/${encodeURIComponent(filename)}`
 }

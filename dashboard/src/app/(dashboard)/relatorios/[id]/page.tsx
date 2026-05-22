@@ -8,18 +8,25 @@ import { StatusBadge } from "@/components/reports/status-badge"
 import { fetchReportDetail, getReportDownloadUrl } from "@/lib/api"
 import { Download, Search, Loader2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import type { ReportDetail, ReportResult } from "@/types"
 
 export default function ReportDetailPage() {
   const params = useParams()
-  const filename = decodeURIComponent(params.id as string)
-  const [data, setData] = useState<any>(null)
+  const rawId = params?.id
+  const idParam = Array.isArray(rawId) ? rawId[0] : rawId
+  const filename = idParam ? decodeURIComponent(idParam) : ""
+  const [data, setData] = useState<ReportDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [brandFilter, setBrandFilter] = useState("")
 
   useEffect(() => {
-    fetchReportDetail(filename)
+    if (!filename) {
+      setLoading(false)
+      return
+    }
+    (fetchReportDetail(filename) as Promise<ReportDetail>)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false))
@@ -45,10 +52,10 @@ export default function ReportDetailPage() {
     )
   }
 
-  const results = data.results || []
+  const results: ReportResult[] = data.results || []
   const summary = data.summary || {}
 
-  const filtered = results.filter((r: any) => {
+  const filtered = results.filter((r) => {
     if (search) {
       const q = search.toLowerCase()
       if (!r.sku?.toLowerCase().includes(q) && !r.name?.toLowerCase().includes(q)) return false
@@ -58,8 +65,8 @@ export default function ReportDetailPage() {
     return true
   })
 
-  const statuses = [...new Set(results.map((r: any) => r.status))] as string[]
-  const brands = [...new Set(results.map((r: any) => r.brand))] as string[]
+  const statuses = [...new Set(results.map((r) => r.status))]
+  const brands = [...new Set(results.map((r) => r.brand))]
 
   return (
     <>
@@ -82,12 +89,20 @@ export default function ReportDetailPage() {
         <StatsCards
           data={{
             total: summary.total || results.length,
-            ok: summary.ok || results.filter((r: any) => r.status === "OK").length,
-            missing: summary.missing || results.filter((r: any) => r.status === "MISSING").length,
-            inconsistent: summary.inconsistent || results.filter((r: any) => r.status === "INCONSISTENT").length,
-            not_found: summary.not_found || results.filter((r: any) => r.status === "URL_NOT_FOUND").length,
+            ok: summary.ok || results.filter((r) => r.status === "OK").length,
+            missing: summary.missing || results.filter((r) => r.status === "MISSING").length,
+            inconsistent: summary.inconsistent || results.filter((r) => r.status === "INCONSISTENT").length,
+            not_found: summary.not_found || results.filter((r) => r.status === "URL_NOT_FOUND").length,
           }}
         />
+
+        {/* Extra counter for NO_EXPECTED (no expected text) */}
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400">
+          <span className="font-medium">Sem texto esperado:</span>
+          <span className="font-mono">
+            {results.filter((r) => r.status === "NO_EXPECTED").length}
+          </span>
+        </div>
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3">
@@ -132,18 +147,22 @@ export default function ReportDetailPage() {
                   <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">SKU</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Nome</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Marca</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Site</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Cert</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Validacao</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Score</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">URL</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filtered.map((r: any, i: number) => (
+                {filtered.map((r, i) => (
                   <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                     <td className="px-4 py-3 font-mono text-slate-900 dark:text-white">{r.sku}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">{r.name}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{r.brand}</td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={r.site_status ?? null} variant="site" /></td>
+                    <td className="px-4 py-3"><StatusBadge status={r.cert_status ?? null} variant="cert" /></td>
+                    <td className="px-4 py-3"><StatusBadge status={r.status} variant="validation" /></td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{r.score?.toFixed(2)}</td>
                     <td className="px-4 py-3">
                       {r.url && (

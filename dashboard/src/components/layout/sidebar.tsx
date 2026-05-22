@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useEffect, useState } from "react"
@@ -13,12 +14,14 @@ import {
   ChevronLeft,
   Package,
   CalendarClock,
+  KeyRound,
 } from "lucide-react"
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/validacao", label: "Validacao", icon: PlayCircle },
   { href: "/produtos", label: "Produtos", icon: Package },
+  { href: "/licenciamento", label: "Licenciamento", icon: KeyRound },
   { href: "/relatorios", label: "Relatorios", icon: FileBarChart },
   { href: "/agendamentos", label: "Agendamentos", icon: CalendarClock },
   { href: "/configuracoes", label: "Configuracoes", icon: Settings },
@@ -47,9 +50,11 @@ export function Sidebar({ mobile }: { mobile?: boolean } = {}) {
     >
       <div className="flex items-center gap-3 px-4 h-16 border-b border-slate-200 dark:border-slate-800">
         <div className="relative flex-shrink-0">
-          <img
+          <Image
             src="/logo-unico.png"
             alt="Uni.co"
+            width={32}
+            height={32}
             className="w-8 h-8 rounded-full"
           />
           <span

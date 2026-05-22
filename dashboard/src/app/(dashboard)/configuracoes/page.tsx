@@ -8,18 +8,17 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, XCircle, Database, Globe, Cpu, Zap, Loader2, Radio, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { Stats } from "@/types"
 
 export default function SettingsPage() {
-  const [status, setStatus] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [status, setStatus] = useState<Stats | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ connected: boolean; latencyMs: number } | null>(null)
 
   useEffect(() => {
-    fetchStats()
+    (fetchStats() as Promise<Stats>)
       .then(setStatus)
       .catch(() => setStatus(null))
-      .finally(() => setLoading(false))
   }, [])
 
   const isConnected = status !== null

@@ -31,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user && token.email) {
-        (session.user as any).role = ADMIN_EMAILS.includes(token.email) ? "admin" : "viewer"
+        session.user.role = ADMIN_EMAILS.includes(token.email) ? "admin" : "viewer"
       }
       return session
     },

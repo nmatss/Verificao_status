@@ -70,17 +70,59 @@ export function cronToHuman(cron: string): string {
   if (day === "*" && dow === "*") {
     return `Diariamente as ${time}`
   }
-  return cron
+  // Both day-of-month and day-of-week constrained: be explicit instead of returning raw cron.
+  const dayName = dayOfWeekNames[dow] || dow
+  return `Dia ${day} de cada mes e/ou ${dayName} as ${time}`
 }
 
 export function statusColor(status: string) {
   switch (status) {
-    case "OK": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-    case "MISSING": return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-    case "INCONSISTENT": return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-    case "URL_NOT_FOUND": return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-    case "API_ERROR": return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-    case "NO_EXPECTED": return "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500"
-    default: return "bg-slate-100 text-slate-600"
+    case "OK":
+    case "ATIVO":
+    case "CONFORME":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+    case "MISSING":
+    case "ENCERRADO":
+    case "NAO_CONFORME":
+    case "VENCIDO":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+    case "INCONSISTENT":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+    case "URL_NOT_FOUND":
+    case "SKU_EXCLUIDO":
+    case "NAO_APLICAVEL":
+      return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+    case "API_ERROR":
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+    case "EM_ANDAMENTO":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+    case "NO_EXPECTED":
+    case "PENDENTE":
+    case "DESCONHECIDO":
+      return "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500"
+    default:
+      return "bg-slate-100 text-slate-600"
+  }
+}
+
+export function statusLabel(status: string): string {
+  switch (status) {
+    case "OK": return "OK"
+    case "MISSING": return "Faltando"
+    case "INCONSISTENT": return "Inconsistente"
+    case "URL_NOT_FOUND": return "URL nao encontrada"
+    case "API_ERROR": return "Erro de API"
+    case "NO_EXPECTED": return "Sem texto esperado"
+    case "ATIVO": return "Ativo"
+    case "ENCERRADO": return "Encerrado"
+    case "SKU_EXCLUIDO": return "SKU excluido"
+    case "EM_ANDAMENTO": return "Em andamento"
+    case "DESCONHECIDO": return "Desconhecido"
+    case "CONFORME": return "Conforme"
+    case "NAO_CONFORME": return "Nao conforme"
+    case "PENDENTE": return "Pendente"
+    case "VENCIDO": return "Vencido"
+    case "NAO_APLICAVEL": return "Nao aplicavel"
+    default: return status
   }
 }

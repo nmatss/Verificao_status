@@ -27,6 +27,7 @@ Thumbs.db
 # Zone identifiers (Windows)
 *:Zone.Identifier
 
-# Reports (generated)
-reports/
+# Reports (generated) - raiz only para não colidir com dashboard/src/components/reports
+/reports/
+/verificacao_certificacao/reports/
 n8n-grupo-unico-b55e711ba40d.json

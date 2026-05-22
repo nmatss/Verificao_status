@@ -3,28 +3,27 @@
 import { useEffect, useState, useRef } from "react"
 import { cn, statusColor } from "@/lib/utils"
 import { streamValidation } from "@/lib/api"
-import { CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react"
-
-interface ProgressEvent {
-  type: "progress" | "complete" | "error"
-  current?: number
-  total?: number
-  product?: { sku: string; name: string; status: string; score: number }
-  summary?: any
-  error?: string
-}
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import type { ProgressEventData, ValidationSummary } from "@/types"
 
 export function ValidationProgress({
   runId,
   onComplete,
 }: {
   runId: string | null
-  onComplete?: (summary: any) => void
+  onComplete?: (summary: ValidationSummary | undefined) => void
 }) {
-  const [events, setEvents] = useState<ProgressEvent[]>([])
+  const [events, setEvents] = useState<ProgressEventData[]>([])
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [status, setStatus] = useState<"running" | "complete" | "error">("running")
   const logRef = useRef<HTMLDivElement>(null)
+  const onCompleteRef = useRef(onComplete)
+
+  // Keep latest onComplete in a ref so the streaming effect does not need to re-run
+  // when the parent re-renders with a new (but functionally equivalent) callback.
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
 
   useEffect(() => {
     if (!runId) return
@@ -33,13 +32,13 @@ export function ValidationProgress({
     setProgress({ current: 0, total: 0 })
     setStatus("running")
 
-    const es = streamValidation(runId, (data: ProgressEvent) => {
+    const es = streamValidation(runId, (data: ProgressEventData) => {
       if (data.type === "progress") {
         setProgress({ current: data.current || 0, total: data.total || 0 })
         setEvents((prev) => [...prev, data])
       } else if (data.type === "complete") {
         setStatus("complete")
-        onComplete?.(data.summary)
+        onCompleteRef.current?.(data.summary)
       } else if (data.type === "error") {
         setStatus("error")
       }
@@ -86,16 +85,19 @@ export function ValidationProgress({
       </div>
 
       <div ref={logRef} className="max-h-64 overflow-auto p-3 space-y-1 font-mono text-xs">
-        {events.map((e, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-slate-400 w-8 text-right">{e.current}</span>
-            <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", statusColor(e.product?.status || ""))}>
-              {e.product?.status}
-            </span>
-            <span className="text-slate-600 dark:text-slate-400">{e.product?.sku}</span>
-            <span className="text-slate-400 truncate">{e.product?.name}</span>
-          </div>
-        ))}
+        {events.map((e, i) => {
+          if (e.type !== "progress") return null
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-slate-400 w-8 text-right">{e.current}</span>
+              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", statusColor(e.product?.status || ""))}>
+                {e.product?.status}
+              </span>
+              <span className="text-slate-600 dark:text-slate-400">{e.product?.sku}</span>
+              <span className="text-slate-400 truncate">{e.product?.name}</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

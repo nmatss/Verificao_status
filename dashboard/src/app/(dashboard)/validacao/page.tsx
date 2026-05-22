@@ -1,54 +1,78 @@
 "use client"
 
-import { useState } from "react"
-import { useSession } from "next-auth/react"
+import { useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { ValidationProgress } from "@/components/dashboard/validation-progress"
 import { StatsCards } from "@/components/dashboard/stats-cards"
-import { startValidation } from "@/lib/api"
+import { fetchStats, startValidation } from "@/lib/api"
 import { PlayCircle, Loader2, ShieldCheck, Filter, Radio, Clock, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import type { Stats, ValidationSummary } from "@/types"
 
-const BRANDS = [
-  { value: "", label: "Todas as Marcas", count: 258 },
-  { value: "imaginarium", label: "Imaginarium", count: 103 },
-  { value: "puket", label: "Puket", count: 38 },
-  { value: "puket_escolares", label: "Puket Escolares", count: 117 },
+const BRAND_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Todas as Marcas" },
+  { value: "imaginarium", label: "Imaginarium" },
+  { value: "puket", label: "Puket" },
+  { value: "puket_escolares", label: "Puket Escolares" },
 ]
 
 export default function ValidationPage() {
-  const { data: session } = useSession()
   const [brand, setBrand] = useState("")
   const [runId, setRunId] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
-  const [summary, setSummary] = useState<any>(null)
+  const [summary, setSummary] = useState<ValidationSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
 
-  const selectedBrand = BRANDS.find((b) => b.value === brand)
-  const productCount = selectedBrand?.count || 258
+  useEffect(() => {
+    (fetchStats() as Promise<Stats>).then(setStats).catch(() => setStats(null))
+  }, [])
+
+  function brandCount(value: string): number {
+    if (!stats) return 0
+    if (!value) {
+      if (stats.total_products) return stats.total_products
+      return (stats.by_brand ?? []).reduce(
+        (acc, b) =>
+          acc + (b.total ?? b.ok + b.missing + b.inconsistent + b.not_found),
+        0
+      )
+    }
+    const bucket = (stats.by_brand ?? []).find(
+      (b) => b.brand.toLowerCase().replace(" ", "_") === value
+    )
+    if (!bucket) return 0
+    return (
+      bucket.total ??
+      bucket.ok + bucket.missing + bucket.inconsistent + bucket.not_found
+    )
+  }
+
+  const productCount = brandCount(brand)
   const estimatedSeconds = Math.ceil(productCount * 1.5)
-  const estimatedMinutes = Math.ceil(estimatedSeconds / 60)
+  const estimatedMinutes = Math.max(1, Math.ceil(estimatedSeconds / 60))
 
   async function handleStart() {
     setError(null)
     setSummary(null)
     setRunning(true)
     try {
-      const res = await startValidation({
+      const res = (await startValidation({
         brand: brand || undefined,
-        source: "sheets",
-      })
+        source: "excel",
+      })) as { run_id: string }
       setRunId(res.run_id)
-    } catch (e: any) {
-      setError(e.message || "Erro ao iniciar validacao")
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro ao iniciar validacao"
+      setError(message)
       setRunning(false)
     }
   }
 
-  function handleComplete(sum: any) {
-    setSummary(sum)
+  function handleComplete(sum: ValidationSummary | undefined) {
+    setSummary(sum ?? null)
     setRunning(false)
   }
 
@@ -94,9 +118,9 @@ export default function ValidationPage() {
                   disabled={running}
                   className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {BRANDS.map((b) => (
+                  {BRAND_OPTIONS.map((b) => (
                     <option key={b.value} value={b.value}>
-                      {b.label} ({b.count})
+                      {b.label} ({brandCount(b.value)})
                     </option>
                   ))}
                 </select>

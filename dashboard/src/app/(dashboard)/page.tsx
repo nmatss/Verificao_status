@@ -8,6 +8,13 @@ import { fetchStats, fetchReports, fetchReportDetail, checkApiHealth } from "@/l
 import { formatDate, relativeTime, cn, statusColor } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import type {
+  Stats,
+  StatsBucket,
+  ReportListItem,
+  ReportResult,
+  ReportDetail,
+} from "@/types"
 import {
   PlayCircle,
   FileBarChart,
@@ -18,7 +25,19 @@ import {
   ArrowRight,
 } from "lucide-react"
 import Link from "next/link"
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from "recharts"
 
 const PIE_COLORS = {
   OK: "#10b981",
@@ -27,31 +46,51 @@ const PIE_COLORS = {
   NOT_FOUND: "#94a3b8",
 }
 
+const SITE_COLORS: Record<string, string> = {
+  CONFORME: "#10b981",
+  NAO_CONFORME: "#ef4444",
+  PENDENTE: "#94a3b8",
+}
+
+const CERT_COLORS: Record<string, string> = {
+  ATIVO: "#10b981",
+  ENCERRADO: "#ef4444",
+  SKU_EXCLUIDO: "#94a3b8",
+  EM_ANDAMENTO: "#3b82f6",
+  DESCONHECIDO: "#cbd5e1",
+}
+
 export default function DashboardPage() {
-  const [stats, setStats] = useState<any>(null)
-  const [reports, setReports] = useState<any[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [reports, setReports] = useState<ReportListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [apiOnline, setApiOnline] = useState(false)
-  const [problemProducts, setProblemProducts] = useState<any[]>([])
+  const [problemProducts, setProblemProducts] = useState<ReportResult[]>([])
 
   useEffect(() => {
     Promise.all([
-      fetchStats().catch(() => null),
-      fetchReports().catch(() => []),
+      fetchStats().catch(() => null) as Promise<Stats | null>,
+      fetchReports().catch(() => []) as Promise<ReportListItem[]>,
       checkApiHealth(),
     ]).then(([s, r, health]) => {
       setStats(s)
       setApiOnline(health.connected)
-      const reportList = Array.isArray(r) ? r : []
+      const reportList: ReportListItem[] = Array.isArray(r) ? r : []
       setReports(reportList.slice(0, 5))
 
       // Load problem products from the latest report
       if (reportList.length > 0 && reportList[0]?.filename) {
-        fetchReportDetail(reportList[0].filename)
+        ;(fetchReportDetail(reportList[0].filename) as Promise<ReportDetail | ReportResult[]>)
           .then((data) => {
-            const items = Array.isArray(data) ? data : data?.products || data?.results || []
+            const items: ReportResult[] = Array.isArray(data)
+              ? data
+              : data?.results ?? []
             const problems = items
-              .filter((p: any) => p.status === "MISSING" || p.status === "INCONSISTENT")
+              .filter((p) =>
+                p.site_status === "NAO_CONFORME" ||
+                p.status === "MISSING" ||
+                p.status === "INCONSISTENT"
+              )
               .slice(0, 10)
             setProblemProducts(problems)
           })
@@ -63,8 +102,8 @@ export default function DashboardPage() {
   }, [])
 
   const lastRun = stats?.last_run
-  const okRate = lastRun && lastRun.total > 0
-    ? ((lastRun.ok / lastRun.total) * 100).toFixed(1)
+  const okRate = lastRun && (lastRun.total ?? 0) > 0
+    ? (((lastRun.ok ?? 0) / (lastRun.total ?? 1)) * 100).toFixed(1)
     : null
 
   const pieData = lastRun
@@ -74,6 +113,41 @@ export default function DashboardPage() {
         { name: "Inconsistente", value: lastRun.inconsistent || 0 },
         { name: "Nao Encontrado", value: lastRun.not_found || 0 },
       ].filter((d) => d.value > 0)
+    : []
+
+  const siteStatusData: { name: string; value: number; raw: string }[] = Array.isArray(
+    stats?.by_site_status
+  )
+    ? (stats.by_site_status as StatsBucket[])
+        .filter((s) => s.site_status)
+        .map((s) => ({
+          name: s.site_status as string,
+          value: s.count,
+          raw: s.site_status as string,
+        }))
+        .filter((d) => d.value > 0)
+    : []
+
+  type BrandCertRow = { brand: string } & Record<string, number | string>
+  const brandCertData: BrandCertRow[] = Array.isArray(stats?.by_brand_cert_status)
+    ? stats.by_brand_cert_status.map((row) => {
+        const out: BrandCertRow = { brand: String(row.brand ?? "") }
+        for (const key of Object.keys(CERT_COLORS)) {
+          const v = row[key]
+          out[key] = typeof v === "number" ? v : 0
+        }
+        return out
+      })
+    : Array.isArray(stats?.by_cert_status)
+    ? [
+        (stats.by_cert_status as StatsBucket[]).reduce<BrandCertRow>(
+          (acc, s) => {
+            if (s.cert_status) acc[s.cert_status] = s.count
+            return acc
+          },
+          { brand: "Total" }
+        ),
+      ]
     : []
 
   return (
@@ -133,11 +207,110 @@ export default function DashboardPage() {
         />
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Status Distribution Pie Chart */}
+          {/* Site Status Pie Chart */}
           <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
-                Distribuicao de Status
+                Status no Site
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {siteStatusData.length > 0 ? (
+                <div className="flex items-center gap-4">
+                  <ResponsiveContainer width="50%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={siteStatusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {siteStatusData.map((entry, i) => (
+                          <Cell key={i} fill={SITE_COLORS[entry.raw] ?? PIE_COLORS.NOT_FOUND} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--card)",
+                          color: "var(--card-foreground)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex-1 space-y-2">
+                    {siteStatusData.map((d) => (
+                      <div key={d.raw} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-3 h-3 rounded-sm"
+                            style={{ backgroundColor: SITE_COLORS[d.raw] ?? PIE_COLORS.NOT_FOUND }}
+                          />
+                          <span className="text-slate-600 dark:text-slate-400">{d.name}</span>
+                        </div>
+                        <span className="font-medium text-slate-900 dark:text-white">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 text-sm text-slate-400">
+                  Nenhum dado disponivel
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Cert Status by Brand Bar Chart */}
+          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
+                Certificacao por Marca
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {brandCertData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={brandCertData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="brand" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "var(--card)",
+                        color: "var(--card-foreground)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: "12px" }} />
+                    {Object.entries(CERT_COLORS).map(([key, color]) => (
+                      <Bar key={key} dataKey={key} name={key} fill={color} radius={[2, 2, 0, 0]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-48 text-sm text-slate-400">
+                  Nenhum dado disponivel
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Status Distribution Pie Chart (validation/technical) */}
+          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
+                Resultado da Ultima Verificacao
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -231,10 +404,10 @@ export default function DashboardPage() {
                 </CardTitle>
                 {problemProducts.length > 0 && (
                   <Link
-                    href="/produtos?status=MISSING,INCONSISTENT"
+                    href="/produtos?site_status=NAO_CONFORME"
                     className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
                   >
-                    Ver todos <ArrowRight className="w-3 h-3" />
+                    Ver todos com problema <ArrowRight className="w-3 h-3" />
                   </Link>
                 )}
               </div>
@@ -246,25 +419,28 @@ export default function DashboardPage() {
                 </p>
               ) : (
                 <div className="space-y-1.5">
-                  {problemProducts.map((p: any, i: number) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {p.status === "MISSING" ? (
-                          <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                        ) : (
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                        )}
-                        <span className="text-xs font-mono text-slate-500 flex-shrink-0">{p.sku}</span>
-                        <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{p.name}</span>
+                  {problemProducts.map((p, i) => {
+                    const badge = p.site_status || p.status
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {badge === "NAO_CONFORME" || badge === "MISSING" ? (
+                            <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                          ) : (
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                          )}
+                          <span className="text-xs font-mono text-slate-500 flex-shrink-0">{p.sku}</span>
+                          <span className="text-sm text-slate-700 dark:text-slate-300 truncate">{p.name}</span>
+                        </div>
+                        <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", statusColor(badge))}>
+                          {badge}
+                        </span>
                       </div>
-                      <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", statusColor(p.status))}>
-                        {p.status}
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -317,7 +493,7 @@ export default function DashboardPage() {
                   <p className="text-sm text-slate-400 py-4 text-center">Nenhuma validacao realizada</p>
                 ) : (
                   <div className="space-y-2">
-                    {reports.map((r: any, i: number) => (
+                    {reports.map((r, i) => (
                       <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
                         <div className="flex items-center gap-2">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />

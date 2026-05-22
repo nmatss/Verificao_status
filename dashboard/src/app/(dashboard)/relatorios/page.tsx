@@ -6,13 +6,14 @@ import { fetchReports, getReportDownloadUrl } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import { FileSpreadsheet, Download, Eye, Loader2 } from "lucide-react"
 import Link from "next/link"
+import type { ReportListItem } from "@/types"
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<any[]>([])
+  const [reports, setReports] = useState<ReportListItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchReports()
+    (fetchReports() as Promise<ReportListItem[]>)
       .then((data) => setReports(Array.isArray(data) ? data : []))
       .catch(() => setReports([]))
       .finally(() => setLoading(false))
@@ -41,7 +42,7 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {reports.map((report: any, i: number) => (
+              {reports.map((report, i) => (
                 <div key={i} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-center gap-3">
                     <FileSpreadsheet className="w-5 h-5 text-emerald-600" />

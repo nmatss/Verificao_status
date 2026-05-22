@@ -15,6 +15,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   relatorios: "Relatorios",
   agendamentos: "Agendamentos",
   configuracoes: "Configuracoes",
+  licenciamento: "Licenciamento",
 }
 
 export function Header({ title }: { title?: string }) {
@@ -32,6 +33,7 @@ export function Header({ title }: { title?: string }) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowMobile(!showMobile)}
+            aria-label="Abrir menu"
             className="md:hidden text-slate-600 dark:text-slate-400"
           >
             <Menu className="w-5 h-5" />
@@ -74,6 +76,7 @@ export function Header({ title }: { title?: string }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+            aria-label="Alternar tema"
             className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             {resolvedTheme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -86,7 +89,13 @@ export function Header({ title }: { title?: string }) {
                 className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 {session.user.image ? (
-                  <img src={session.user.image} alt="" className="w-8 h-8 rounded-full" />
+                  // External avatar (Google CDN) - skip next/image to avoid domain config requirement
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name ?? "Avatar"}
+                    className="w-8 h-8 rounded-full"
+                  />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
                     {session.user.name?.[0] || "U"}
@@ -95,7 +104,7 @@ export function Header({ title }: { title?: string }) {
                 <div className="hidden sm:block text-left">
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{session.user.name}</p>
                   <p className="text-[10px] text-slate-500">
-                    {(session.user as any).role === "admin" ? "Administrador" : "Visualizador"}
+                    {session.user.role === "admin" ? "Administrador" : "Visualizador"}
                   </p>
                 </div>
               </button>

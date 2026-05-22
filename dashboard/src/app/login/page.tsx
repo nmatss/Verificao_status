@@ -1,6 +1,7 @@
 "use client"
 
 import { signIn } from "next-auth/react"
+import Image from "next/image"
 
 export default function LoginPage() {
   return (
@@ -9,10 +10,13 @@ export default function LoginPage() {
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4">
-              <img
+              <Image
                 src="/logo-unico.png"
                 alt="Uni.co"
+                width={80}
+                height={80}
                 className="w-20 h-20 rounded-full"
+                priority
               />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">

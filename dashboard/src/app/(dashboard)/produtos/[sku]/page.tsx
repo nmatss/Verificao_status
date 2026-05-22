@@ -16,23 +16,35 @@ import {
   RefreshCw,
   ShieldCheck,
   AlertCircle,
+  Boxes,
 } from "lucide-react"
+import type { ProductDetail, ProductValidationResult } from "@/types"
 
 export default function ProductDetailPage() {
   const params = useParams()
-  const sku = decodeURIComponent(params.sku as string)
-  const [product, setProduct] = useState<any>(null)
+  const rawSku = params?.sku
+  const skuParam = Array.isArray(rawSku) ? rawSku[0] : rawSku
+  const sku = skuParam ? decodeURIComponent(skuParam) : ""
+  const [product, setProduct] = useState<ProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
-  const [liveResult, setLiveResult] = useState<any>(null)
+  const [liveResult, setLiveResult] = useState<ProductValidationResult | null>(null)
 
   useEffect(() => {
+    if (!sku) {
+      setLoading(false)
+      setError("SKU invalido")
+      return
+    }
     setLoading(true)
     setError(null)
-    fetchProductDetail(sku)
+    ;(fetchProductDetail(sku) as Promise<ProductDetail>)
       .then(setProduct)
-      .catch((e) => setError(e.message || "Erro ao carregar produto"))
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "Erro ao carregar produto"
+        setError(message)
+      })
       .finally(() => setLoading(false))
   }, [sku])
 
@@ -42,16 +54,21 @@ export default function ProductDetailPage() {
     setLiveResult(null)
     try {
       const brandKey = product.brand.toLowerCase().replace(" ", "_")
-      const result = await verifyProduct(sku, brandKey)
+      const result = (await verifyProduct(sku, brandKey)) as ProductValidationResult
       setLiveResult(result)
-    } catch (e: any) {
-      setLiveResult({ error: e.message || "Erro na verificacao" })
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro na verificacao"
+      setLiveResult({ error: message })
     } finally {
       setVerifying(false)
     }
   }
 
   const validation = liveResult || product?.last_validation
+  const siteStatus =
+    liveResult?.site_status ?? product?.last_validation?.site_status ?? null
+  const certStatus = product?.cert_status
+  const licenseStatus = product?.license_status
 
   return (
     <>
@@ -97,6 +114,20 @@ export default function ProductDetailPage() {
                       <span>{product.brand}</span>
                       <span className="w-1 h-1 rounded-full bg-slate-300" />
                       <span>Linha {product.excel_row}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Site</span>
+                        <StatusBadge status={siteStatus ?? null} variant="site" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Cert</span>
+                        <StatusBadge status={certStatus ?? null} variant="cert" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Licenca</span>
+                        <StatusBadge status={licenseStatus ?? null} variant="license" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -149,7 +180,7 @@ export default function ProductDetailPage() {
                 {(validation.date || validation.verified_at) && (
                   <p className="text-xs text-slate-500">
                     {liveResult ? "Verificado em: " : "Data: "}
-                    {formatDate(validation.verified_at || validation.date)}
+                    {formatDate((validation.verified_at || validation.date) as string)}
                     {liveResult && (
                       <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-[10px] font-medium">
                         LIVE
@@ -175,6 +206,76 @@ export default function ProductDetailPage() {
                     {validation.error}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Spreadsheet data */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+                Dados da Planilha
+              </h4>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Situacao</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5">
+                    {product.situacao || <span className="text-slate-400 italic">--</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Tipo de Certificacao</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5">
+                    {product.tipo_certificacao || <span className="text-slate-400 italic">--</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Validade Certificacao</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5">
+                    {product.validade_certificacao_raw || <span className="text-slate-400 italic">--</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Prazo Final Venda</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5">
+                    {product.prazo_final_venda_raw || <span className="text-slate-400 italic">--</span>}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Numero Registro</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5 font-mono text-xs">
+                    {product.numero_registro || <span className="text-slate-400 italic font-sans">--</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Cod. Barras (EAN)</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5 font-mono text-xs">
+                    {product.codigo_barras || <span className="text-slate-400 italic font-sans">--</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wider text-slate-400">Estoque (planilha)</dt>
+                  <dd className="text-slate-700 dark:text-slate-300 mt-0.5">
+                    {product.estoque_informado != null
+                      ? product.estoque_informado.toLocaleString("pt-BR")
+                      : <span className="text-slate-400 italic">--</span>}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {product.estoque_informado != null && product.estoque_informado >= 0 && (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex-shrink-0">
+                  <Boxes className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Estoque informado</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-white leading-tight">
+                    {product.estoque_informado.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Fonte: planilha &mdash; WMS nao integrado ainda
+                  </p>
+                </div>
               </div>
             )}
 

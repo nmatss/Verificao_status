@@ -20,30 +20,10 @@ import {
   Loader2,
   Clock,
   History,
-  ChevronDown,
   ChevronUp,
   X,
 } from "lucide-react"
-
-interface Schedule {
-  id: string
-  name: string
-  brand_filter: string | null
-  cron_expression: string
-  enabled: boolean
-  created_at: string
-  last_run: string | null
-  next_run: string | null
-}
-
-interface HistoryEntry {
-  id: string
-  schedule_id: string
-  run_date: string
-  status: string
-  summary: any
-  report_file: string | null
-}
+import type { Schedule, ScheduleHistoryEntry } from "@/types"
 
 const BRAND_OPTIONS = [
   { value: "", label: "Todas as marcas" },
@@ -97,7 +77,7 @@ export default function AgendamentosPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null)
-  const [historyData, setHistoryData] = useState<Record<string, HistoryEntry[]>>({})
+  const [historyData, setHistoryData] = useState<Record<string, ScheduleHistoryEntry[]>>({})
   const [historyLoading, setHistoryLoading] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -116,8 +96,8 @@ export default function AgendamentosPage() {
 
   const loadSchedules = useCallback(async () => {
     try {
-      const data = await fetchSchedules()
-      setSchedules(Array.isArray(data) ? data : [])
+      const data = (await fetchSchedules()) as Schedule[] | unknown
+      setSchedules(Array.isArray(data) ? (data as Schedule[]) : [])
     } catch {
       setSchedules([])
     } finally {
@@ -202,8 +182,9 @@ export default function AgendamentosPage() {
       setShowForm(false)
       resetForm()
       await loadSchedules()
-    } catch (err: any) {
-      setFormError(err?.message || "Erro ao salvar agendamento")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao salvar agendamento"
+      setFormError(message)
     } finally {
       setSaving(false)
     }
@@ -251,8 +232,11 @@ export default function AgendamentosPage() {
     if (!historyData[id]) {
       setHistoryLoading(id)
       try {
-        const data = await fetchScheduleHistory(id)
-        setHistoryData((prev) => ({ ...prev, [id]: Array.isArray(data) ? data.slice(0, 5) : [] }))
+        const data = (await fetchScheduleHistory(id)) as ScheduleHistoryEntry[] | unknown
+        setHistoryData((prev) => ({
+          ...prev,
+          [id]: Array.isArray(data) ? (data as ScheduleHistoryEntry[]).slice(0, 5) : [],
+        }))
       } catch {
         setHistoryData((prev) => ({ ...prev, [id]: [] }))
       } finally {
@@ -444,13 +428,13 @@ export default function AgendamentosPage() {
                             {entry.summary && typeof entry.summary === "object" && (
                               <div className="flex items-center gap-2 text-slate-500">
                                 <span>{entry.summary.total || 0} produtos</span>
-                                {entry.summary.ok > 0 && (
+                                {(entry.summary.ok ?? 0) > 0 && (
                                   <span className="text-emerald-600">{entry.summary.ok} OK</span>
                                 )}
-                                {entry.summary.missing > 0 && (
+                                {(entry.summary.missing ?? 0) > 0 && (
                                   <span className="text-red-600">{entry.summary.missing} ausentes</span>
                                 )}
-                                {entry.summary.inconsistent > 0 && (
+                                {(entry.summary.inconsistent ?? 0) > 0 && (
                                   <span className="text-amber-600">
                                     {entry.summary.inconsistent} inconsist.
                                   </span>
