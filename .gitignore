@@ -31,3 +31,7 @@ Thumbs.db
 /reports/
 /verificacao_certificacao/reports/
 n8n-grupo-unico-b55e711ba40d.json
+
+# Runtime SQLite
+data/schedules.db
+data/*.db-journal
